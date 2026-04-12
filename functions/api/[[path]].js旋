@@ -1,0 +1,41 @@
+export async function onRequest(context) {
+  const { request } = context;
+  const url = new URL(request.url);
+  
+  // Reconstruct the target URL for the Atomberg API
+  const targetBase = 'https://api.developer.atomberg-iot.com';
+  const apiPath = url.pathname.replace(/^\/api/, '');
+  const targetUrl = new URL(apiPath + url.search, targetBase);
+
+  console.log(`Proxying ${url.pathname} to ${targetUrl.toString()}`);
+
+  // Create new headers based on the original request
+  const newHeaders = new Headers(request.headers);
+  
+  // Remove restricted headers that might interfere with Atomberg's security policy
+  newHeaders.delete('Origin');
+  newHeaders.delete('Referer');
+
+  // Create the proxied request
+  const proxiedRequest = new Request(targetUrl.toString(), {
+    method: request.method,
+    headers: newHeaders,
+    body: request.body,
+    redirect: 'follow'
+  });
+
+  try {
+    const response = await fetch(proxiedRequest);
+    
+    // Return the response back to the client
+    return response;
+  } catch (error) {
+    return new Response(JSON.stringify({ 
+      status: 'Error', 
+      message: 'Proxy Error: ' + error.message 
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
